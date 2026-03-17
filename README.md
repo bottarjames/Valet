@@ -87,8 +87,8 @@ Projects are stored in `~/.valet/config.json`. You never need to edit this manua
 ```json
 {
   "projects": {
-    "Fika":     "~/Documents/Fika",
-    "Bellbird": "~/Library/Mobile Documents/com~apple~CloudDocs/Projects/Bellbird"
+    "Client A": "~/Documents/ClientA",
+    "Website":  "~/Library/Mobile Documents/com~apple~CloudDocs/Projects/Website"
   }
 }
 ```
