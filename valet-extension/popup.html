@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Valet</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <img src="icons/icon16.png" alt="" class="logo-img" />
+    <span class="title">Valet</span>
+    <span class="bridge-dot" id="bridge-dot"></span>
+  </div>
+
+  <!-- Default destination -->
+  <div class="section">
+    <div class="section-label">SEND DOWNLOADS TO</div>
+    <div id="project-list" class="radio-group"></div>
+  </div>
+
+  <!-- Tab group rules -->
+  <div class="section">
+    <div class="section-label">TAB GROUP RULES <span class="hint">auto-route by group</span></div>
+    <div id="group-rules"></div>
+  </div>
+
+  <!-- Project management -->
+  <div class="section">
+    <div class="section-label">PROJECTS</div>
+    <div id="project-mgmt"></div>
+    <button class="add-btn" id="add-project-btn">+ Add project</button>
+
+    <!-- Inline add form (hidden by default) -->
+    <div id="add-form" class="add-form" style="display:none">
+      <button class="browse-btn" id="browse-btn">📂 Choose folder…</button>
+      <div id="chosen-folder" class="chosen-folder" style="display:none">
+        <div class="chosen-path" id="chosen-path-label"></div>
+        <div class="chosen-name-row">
+          <span class="chosen-name-label">Name:</span>
+          <input id="new-name" class="text-input name-input" type="text" placeholder="Project name" />
+        </div>
+      </div>
+      <input id="new-path" type="hidden" />
+      <div class="add-form-actions" id="add-form-actions" style="display:none">
+        <button class="save-btn" id="save-project-btn">Save</button>
+        <button class="cancel-btn" id="cancel-project-btn">Cancel</button>
+      </div>
+      <div id="cancel-only-row">
+        <button class="cancel-btn" id="cancel-project-btn2">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer" id="footer-status">
+    <span id="status-text">Checking bridge…</span>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
