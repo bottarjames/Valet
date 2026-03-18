@@ -1,68 +1,116 @@
 const BRIDGE = "http://localhost:27182";
 
-// When a download starts, snapshot the active tab's group immediately.
-// This is more reliable than querying at completion time, because:
-//   - The user is almost certainly on the relevant tab right now
-//   - Some sites (Freepik, etc.) trigger downloads via new tabs/windows,
-//     making download.tabId useless at completion time
-chrome.downloads.onCreated.addListener(async (download) => {
-  let groupId = null;
+// ── Continuous tab tracking ────────────────────────────────────────────────
+// Keep the last active grouped-tab's project stored per window.
+// Chrome wakes the service worker for these events, and chrome.storage.local
+// persists across service worker restarts, so we never lose state.
 
-  // 1. If the download has a real source tab, use it directly
+async function updateLastGroup(tabId, windowId) {
+  try {
+    const tab = await chrome.tabs.get(tabId);
+    if (tab.groupId && tab.groupId !== -1) {
+      const group                  = await chrome.tabGroups.get(tab.groupId);
+      const { groupMappings = {} } = await chrome.storage.local.get("groupMappings");
+      const project                = groupMappings[group.title || ""];
+      if (project) {
+        const data = {};
+        data[`lastGroup_${windowId}`] = { project, ts: Date.now() };
+        await chrome.storage.local.set(data);
+        return;
+      }
+    }
+  } catch (_) {}
+  // Tab has no mapped group — clear so stale data doesn't bleed through
+  await chrome.storage.local.remove(`lastGroup_${windowId}`);
+}
+
+chrome.tabs.onActivated.addListener((info) =>
+  updateLastGroup(info.tabId, info.windowId)
+);
+
+chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
+  if (!("groupId" in changeInfo)) return;
+  try {
+    const [active] = await chrome.tabs.query({ active: true, windowId: tab.windowId });
+    if (active?.id === tabId) updateLastGroup(tabId, tab.windowId);
+  } catch (_) {}
+});
+
+// ── Download routing ───────────────────────────────────────────────────────
+
+chrome.downloads.onCreated.addListener(async (download) => {
+  let projectName = null;
+  let source      = "none";
+
+  // 1. Download has a real source tab → use its group
   if (download.tabId && download.tabId !== -1) {
     try {
       const tab = await chrome.tabs.get(download.tabId);
-      if (tab && tab.groupId && tab.groupId !== -1) groupId = tab.groupId;
+      if (tab?.groupId && tab.groupId !== -1) {
+        const group                  = await chrome.tabGroups.get(tab.groupId);
+        const { groupMappings = {} } = await chrome.storage.local.get("groupMappings");
+        projectName = groupMappings[group.title || ""] || null;
+        if (projectName) source = `tabId:${download.tabId}`;
+      }
     } catch (_) {}
   }
 
-  // 2. Fallback: snapshot whatever tab is active RIGHT NOW (download just started)
-  if (groupId == null) {
+  // 2. No tabId — use the continuously-tracked last active group for this window
+  if (!projectName) {
     try {
       const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
       const tab  = tabs[0];
-      if (tab && tab.groupId && tab.groupId !== -1) groupId = tab.groupId;
+      if (tab) {
+        const key    = `lastGroup_${tab.windowId}`;
+        const stored = await chrome.storage.local.get(key);
+        const entry  = stored[key];
+        // Accept if tracked within the last 5 minutes
+        if (entry && (Date.now() - entry.ts) < 300_000) {
+          projectName = entry.project;
+          source      = `tracked:window${tab.windowId}`;
+        }
+      }
     } catch (_) {}
   }
 
-  if (groupId == null) return; // no group — nothing to store
+  console.log(`[Valet] onCreated dl#${download.id} tabId=${download.tabId} → project=${projectName} source=${source}`);
 
-  // 3. Resolve group → project name right now while we have it
-  try {
-    const group                  = await chrome.tabGroups.get(groupId);
-    const { groupMappings = {} } = await chrome.storage.local.get("groupMappings");
-    const projectName            = groupMappings[group.title || ""];
-    if (projectName) {
-      // Store keyed by download ID so onChanged can look it up
-      const key  = `dl_${download.id}`;
-      const data = {};
-      data[key]  = projectName;
-      await chrome.storage.local.set(data);
-    }
-  } catch (_) {}
+  if (!projectName) return;
+
+  // Store keyed by download ID for retrieval at completion
+  const key  = `dl_${download.id}`;
+  const data = {};
+  data[key]  = projectName;
+  await chrome.storage.local.set(data);
 });
 
 chrome.downloads.onChanged.addListener(async (delta) => {
   if (!delta.state || delta.state.current !== "complete") return;
 
   const [download] = await chrome.downloads.search({ id: delta.id });
-  if (!download || !download.filename) return;
+  if (!download?.filename) return;
 
-  const key              = `dl_${delta.id}`;
-  const stored           = await chrome.storage.local.get(key);
-  let   projectName      = stored[key] || null;
+  const key         = `dl_${delta.id}`;
+  const stored      = await chrome.storage.local.get(key);
+  let   projectName = stored[key] || null;
 
-  // Clean up the stored entry
   await chrome.storage.local.remove(key);
 
-  // If no group was captured at creation, fall back to default project
+  console.log(`[Valet] onChanged dl#${delta.id} project=${projectName} file=${download.filename}`);
+
+  // Fall back to default project if no group was captured
   if (!projectName) {
     const { activeProject } = await chrome.storage.local.get("activeProject");
-    if (activeProject) projectName = activeProject;
+    if (activeProject) {
+      projectName = activeProject;
+      console.log(`[Valet] using default project: ${projectName}`);
+    }
   }
 
   if (projectName) await moveFile(download.filename, projectName);
 });
+
+// ── Move ──────────────────────────────────────────────────────────────────
 
 async function moveFile(filePath, projectName) {
   try {
