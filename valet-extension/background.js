@@ -55,19 +55,29 @@ chrome.downloads.onCreated.addListener(async (download) => {
     } catch (_) {}
   }
 
-  // 2. No tabId — use the continuously-tracked last active group for this window
+  // 2. No tabId — check active tab's group directly, then fall back to tracked history
   if (!projectName) {
     try {
       const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
       const tab  = tabs[0];
       if (tab) {
-        const key    = `lastGroup_${tab.windowId}`;
-        const stored = await chrome.storage.local.get(key);
-        const entry  = stored[key];
-        // Accept if tracked within the last 5 minutes
-        if (entry && (Date.now() - entry.ts) < 300_000) {
-          projectName = entry.project;
-          source      = `tracked:window${tab.windowId}`;
+        // 2a. Active tab is itself in a mapped group right now
+        if (tab.groupId && tab.groupId !== -1) {
+          const group                  = await chrome.tabGroups.get(tab.groupId);
+          const { groupMappings = {} } = await chrome.storage.local.get("groupMappings");
+          const mapped                 = groupMappings[group.title || ""] || null;
+          if (mapped) { projectName = mapped; source = `activeTab:${tab.id}`; }
+        }
+
+        // 2b. Active tab has no mapped group — use last tracked group for this window
+        if (!projectName) {
+          const key    = `lastGroup_${tab.windowId}`;
+          const stored = await chrome.storage.local.get(key);
+          const entry  = stored[key];
+          if (entry && (Date.now() - entry.ts) < 300_000) {
+            projectName = entry.project;
+            source      = `tracked:window${tab.windowId}`;
+          }
         }
       }
     } catch (_) {}
