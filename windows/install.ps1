@@ -69,28 +69,29 @@ $pythonExe = (Get-Command $python -ErrorAction SilentlyContinue).Source
 $pythonW   = $pythonExe -replace "python\.exe$","pythonw.exe"
 if (-not (Test-Path $pythonW)) { $pythonW = $pythonExe }
 
-# ── 6. Auto-start via Task Scheduler ─────────────────────────────────────────
+# ── 6. Auto-start via Startup folder (no admin needed) ───────────────────────
 STEP "Setting up auto-start..."
 
-$tasks = @(
-    @{ Name = "Valet Bridge"; Script = "bridge.py" },
-    @{ Name = "Valet Tray";   Script = "tray_app_windows.py" }
-)
+$StartupDir = "$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup"
+New-Item -ItemType Directory -Force -Path $StartupDir | Out-Null
 
-foreach ($t in $tasks) {
-    $action  = New-ScheduledTaskAction -Execute $pythonW -Argument "`"$ValetDir\$($t.Script)`""
-    $trigger = New-ScheduledTaskTrigger -AtLogOn
-    $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
-    Register-ScheduledTask -TaskName $t.Name -Action $action -Trigger $trigger `
-        -Settings $settings -RunLevel Highest -Force | Out-Null
-    OK "Scheduled task: $($t.Name)"
-}
+@"
+@echo off
+start /b "" "$pythonW" "$ValetDir\bridge.py"
+"@ | Out-File -FilePath "$StartupDir\Valet Bridge.bat" -Encoding ascii
+
+@"
+@echo off
+start /b "" "$pythonW" "$ValetDir\tray_app_windows.py"
+"@ | Out-File -FilePath "$StartupDir\Valet Tray.bat" -Encoding ascii
+
+OK "Added to Startup folder (runs automatically at login)"
 
 # ── 7. Start now ──────────────────────────────────────────────────────────────
 STEP "Starting Valet..."
-foreach ($t in $tasks) {
-    Start-ScheduledTask -TaskName $t.Name
-}
+Start-Process $pythonW -ArgumentList "`"$ValetDir\bridge.py`"" -WindowStyle Hidden
+Start-Sleep -Seconds 1
+Start-Process $pythonW -ArgumentList "`"$ValetDir\tray_app_windows.py`"" -WindowStyle Hidden
 Start-Sleep -Seconds 2
 OK "Valet is running"
 
