@@ -1,18 +1,5 @@
 const BRIDGE = "http://localhost:27182";
 
-// Snapshot the origin tab group when download starts (best case)
-chrome.downloads.onCreated.addListener(async (download) => {
-  try {
-    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-    const tab  = tabs[0];
-    if (tab && tab.groupId && tab.groupId !== -1) {
-      const { downloadOrigins = {} } = await chrome.storage.local.get("downloadOrigins");
-      downloadOrigins[download.id]   = tab.groupId;
-      await chrome.storage.local.set({ downloadOrigins });
-    }
-  } catch (_) {}
-});
-
 chrome.downloads.onChanged.addListener(async (delta) => {
   if (!delta.state || delta.state.current !== "complete") return;
 
@@ -21,19 +8,23 @@ chrome.downloads.onChanged.addListener(async (delta) => {
 
   let groupId = null;
 
-  // 1. Use the origin group captured at download-start
-  const { downloadOrigins = {} } = await chrome.storage.local.get("downloadOrigins");
-  if (downloadOrigins[delta.id] != null) {
-    groupId = downloadOrigins[delta.id];
-    delete downloadOrigins[delta.id];
-    await chrome.storage.local.set({ downloadOrigins });
+  // 1. Use download.tabId — the exact tab that triggered the download.
+  //    This is always correct regardless of what tab the user is on now.
+  if (download.tabId && download.tabId !== -1) {
+    try {
+      const tab = await chrome.tabs.get(download.tabId);
+      if (tab && tab.groupId && tab.groupId !== -1) {
+        groupId = tab.groupId;
+      }
+    } catch (_) {
+      // Tab was closed before download finished — fall through
+    }
   }
 
-  // 2. If that was missed (service worker was sleeping), just ask right now
-  //    what tab is active — user is almost certainly still on the same tab
+  // 2. Tab was closed or had no group — fall back to currently active tab
   if (groupId == null) {
     try {
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
       const tab  = tabs[0];
       if (tab && tab.groupId && tab.groupId !== -1) {
         groupId = tab.groupId;
