@@ -39,11 +39,13 @@ body {
 }
 .hint { font-weight: 400; font-size: 10px; color: #48484a; letter-spacing: 0; text-transform: none; }
 
-/* ── Radio group (default destination) ── */
-.radio-group { display: flex; flex-direction: column; gap: 4px; }
-.radio-row   { display: flex; align-items: center; gap: 8px; padding: 2px 0; }
-.radio-row input { accent-color: #0a84ff; cursor: pointer; }
-.radio-row label { cursor: pointer; flex: 1; }
+/* ── Default destination dropdown ── */
+.dest-select {
+  background: #2c2c2e; color: #e5e5ea;
+  border: 1px solid #3a3a3c; border-radius: 6px;
+  padding: 5px 8px; font-size: 12px; cursor: pointer; width: 100%;
+}
+.dest-select:focus { outline: none; border-color: #0a84ff; }
 
 /* ── Tab group rules ── */
 .group-row  { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
