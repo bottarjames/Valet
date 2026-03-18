@@ -12,6 +12,7 @@ Endpoints:
 """
 
 import json
+import logging
 import os
 import platform
 import shutil
@@ -20,8 +21,16 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 from urllib.parse import urlparse
 
 CONFIG_PATH = os.path.expanduser("~/.valet/config.json")
+LOG_PATH    = os.path.expanduser("~/.valet/bridge.log")
 PORT = 27182
 SYSTEM = platform.system()  # "Darwin" or "Windows"
+
+logging.basicConfig(
+    filename=LOG_PATH,
+    level=logging.DEBUG,
+    format="%(asctime)s %(levelname)s %(message)s",
+    datefmt="%H:%M:%S",
+)
 
 
 # ── Config helpers ────────────────────────────────────────────────────────────
@@ -157,23 +166,30 @@ class BridgeHandler(BaseHTTPRequestHandler):
             file_path    = body.get("file", "").strip()
             project_name = body.get("project", "").strip()
 
+            logging.info(f"MOVE requested: project={project_name!r} file={file_path!r}")
+
             if not file_path or not project_name:
+                logging.warning("MOVE failed: missing file or project")
                 self._err(400, "missing 'file' or 'project'")
                 return
             if not os.path.exists(file_path):
+                logging.warning(f"MOVE failed: file not found at {file_path!r}")
                 self._err(404, f"file not found: {file_path}")
                 return
 
             cfg      = load_config()
             projects = cfg.get("projects", {})
             if project_name not in projects:
+                logging.warning(f"MOVE failed: unknown project {project_name!r}")
                 self._err(404, f"unknown project: {project_name}")
                 return
 
             dest_base = os.path.expanduser(projects[project_name])
+            logging.info(f"MOVE dest_base={dest_base!r} exists={os.path.isdir(dest_base)}")
 
             # Folder must already exist — never create it silently
             if not os.path.isdir(dest_base):
+                logging.warning(f"MOVE failed: folder missing {dest_base!r}")
                 self._err(404, f"folder_missing:{project_name}:{dest_base}")
                 return
 
@@ -189,7 +205,9 @@ class BridgeHandler(BaseHTTPRequestHandler):
 
             try:
                 shutil.move(file_path, dest)
+                logging.info(f"MOVE success: {file_path!r} → {dest!r}")
             except Exception as e:
+                logging.error(f"MOVE exception: {e}")
                 self._err(500, str(e))
                 return
 
