@@ -103,18 +103,42 @@ chrome.downloads.onChanged.addListener(async (delta) => {
   const key         = `dl_${delta.id}`;
   const stored      = await chrome.storage.local.get(key);
   let   projectName = stored[key] || null;
+  let   source      = stored[key] ? "stored" : "none";
 
   await chrome.storage.local.remove(key);
 
-  console.log(`[Valet] onChanged dl#${delta.id} project=${projectName} file=${download.filename}`);
+  // onCreated may have missed this download (service worker was waking up).
+  // Do a live detection now as rescue fallback.
+  if (!projectName) {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      const tab  = tabs[0];
+      if (tab) {
+        if (tab.groupId && tab.groupId !== -1) {
+          const group                  = await chrome.tabGroups.get(tab.groupId);
+          const { groupMappings = {} } = await chrome.storage.local.get("groupMappings");
+          const mapped                 = groupMappings[group.title || ""] || null;
+          if (mapped) { projectName = mapped; source = `liveTab:${tab.id}`; }
+        }
+        if (!projectName) {
+          const key2    = `lastGroup_${tab.windowId}`;
+          const stored2 = await chrome.storage.local.get(key2);
+          const entry   = stored2[key2];
+          if (entry && (Date.now() - entry.ts) < 300_000) {
+            projectName = entry.project;
+            source      = `liveTracked:window${tab.windowId}`;
+          }
+        }
+      }
+    } catch (_) {}
+  }
 
-  // Fall back to default project if no group was captured
+  console.log(`[Valet] onChanged dl#${delta.id} project=${projectName} source=${source} file=${download.filename}`);
+
+  // Last resort: default project
   if (!projectName) {
     const { activeProject } = await chrome.storage.local.get("activeProject");
-    if (activeProject) {
-      projectName = activeProject;
-      console.log(`[Valet] using default project: ${projectName}`);
-    }
+    if (activeProject) { projectName = activeProject; }
   }
 
   if (projectName) await moveFile(download.filename, projectName);
