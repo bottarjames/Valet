@@ -1,55 +1,66 @@
 const BRIDGE = "http://localhost:27182";
 
+// When a download starts, snapshot the active tab's group immediately.
+// This is more reliable than querying at completion time, because:
+//   - The user is almost certainly on the relevant tab right now
+//   - Some sites (Freepik, etc.) trigger downloads via new tabs/windows,
+//     making download.tabId useless at completion time
+chrome.downloads.onCreated.addListener(async (download) => {
+  let groupId = null;
+
+  // 1. If the download has a real source tab, use it directly
+  if (download.tabId && download.tabId !== -1) {
+    try {
+      const tab = await chrome.tabs.get(download.tabId);
+      if (tab && tab.groupId && tab.groupId !== -1) groupId = tab.groupId;
+    } catch (_) {}
+  }
+
+  // 2. Fallback: snapshot whatever tab is active RIGHT NOW (download just started)
+  if (groupId == null) {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+      const tab  = tabs[0];
+      if (tab && tab.groupId && tab.groupId !== -1) groupId = tab.groupId;
+    } catch (_) {}
+  }
+
+  if (groupId == null) return; // no group — nothing to store
+
+  // 3. Resolve group → project name right now while we have it
+  try {
+    const group                  = await chrome.tabGroups.get(groupId);
+    const { groupMappings = {} } = await chrome.storage.local.get("groupMappings");
+    const projectName            = groupMappings[group.title || ""];
+    if (projectName) {
+      // Store keyed by download ID so onChanged can look it up
+      const key  = `dl_${download.id}`;
+      const data = {};
+      data[key]  = projectName;
+      await chrome.storage.local.set(data);
+    }
+  } catch (_) {}
+});
+
 chrome.downloads.onChanged.addListener(async (delta) => {
   if (!delta.state || delta.state.current !== "complete") return;
 
   const [download] = await chrome.downloads.search({ id: delta.id });
   if (!download || !download.filename) return;
 
-  let groupId = null;
+  const key              = `dl_${delta.id}`;
+  const stored           = await chrome.storage.local.get(key);
+  let   projectName      = stored[key] || null;
 
-  // 1. Use download.tabId — the exact tab that triggered the download.
-  //    This is always correct regardless of what tab the user is on now.
-  if (download.tabId && download.tabId !== -1) {
-    try {
-      const tab = await chrome.tabs.get(download.tabId);
-      if (tab && tab.groupId && tab.groupId !== -1) {
-        groupId = tab.groupId;
-      }
-    } catch (_) {
-      // Tab was closed before download finished — fall through
-    }
-  }
+  // Clean up the stored entry
+  await chrome.storage.local.remove(key);
 
-  // 2. Tab was closed or had no group — fall back to currently active tab
-  if (groupId == null) {
-    try {
-      const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-      const tab  = tabs[0];
-      if (tab && tab.groupId && tab.groupId !== -1) {
-        groupId = tab.groupId;
-      }
-    } catch (_) {}
-  }
-
-  // 3. Resolve group → project name
-  let projectName = null;
-  if (groupId != null) {
-    try {
-      const group                  = await chrome.tabGroups.get(groupId);
-      const { groupMappings = {} } = await chrome.storage.local.get("groupMappings");
-      const mapped                 = groupMappings[group.title || ""];
-      if (mapped) projectName = mapped;
-    } catch (_) {}
-  }
-
-  // 4. Fall back to default project
+  // If no group was captured at creation, fall back to default project
   if (!projectName) {
     const { activeProject } = await chrome.storage.local.get("activeProject");
     if (activeProject) projectName = activeProject;
   }
 
-  // 5. Move — or leave in Downloads if nothing matched
   if (projectName) await moveFile(download.filename, projectName);
 });
 
