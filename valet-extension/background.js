@@ -1,25 +1,16 @@
-/**
- * background.js — Valet Chrome extension service worker.
- *
- * Listens for completed downloads and either:
- *   1. Auto-moves them based on the active tab's group rule, OR
- *   2. Auto-moves them based on the user's default project, OR
- *   3. Does nothing — file stays in Downloads.
- */
-
 const BRIDGE = "http://localhost:27182";
 
-// ── Download lifecycle ────────────────────────────────────────────────────────
-
 // When a download STARTS, snapshot which tab group triggered it.
+// Uses storage.local (not session) — MV3 service workers can sleep between
+// onCreated and onChanged, wiping session storage.
 chrome.downloads.onCreated.addListener(async (download) => {
   try {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     const tab  = tabs[0];
-    if (tab && tab.groupId && tab.groupId !== chrome.tabGroups.TAB_GROUP_ID_NONE) {
-      const { downloadOrigins = {} } = await chrome.storage.session.get("downloadOrigins");
+    if (tab && tab.groupId && tab.groupId !== -1) {
+      const { downloadOrigins = {} } = await chrome.storage.local.get("downloadOrigins");
       downloadOrigins[download.id]   = tab.groupId;
-      await chrome.storage.session.set({ downloadOrigins });
+      await chrome.storage.local.set({ downloadOrigins });
     }
   } catch (_) {}
 });
@@ -34,7 +25,7 @@ chrome.downloads.onChanged.addListener(async (delta) => {
   let projectName = null;
 
   // 1. Check tab group rules
-  const { downloadOrigins = {} } = await chrome.storage.session.get("downloadOrigins");
+  const { downloadOrigins = {} } = await chrome.storage.local.get("downloadOrigins");
   const groupId = downloadOrigins[delta.id];
 
   if (groupId != null) {
@@ -45,8 +36,9 @@ chrome.downloads.onChanged.addListener(async (delta) => {
       if (mapped) projectName = mapped;
     } catch (_) {}
 
+    // Clean up
     delete downloadOrigins[delta.id];
-    await chrome.storage.session.set({ downloadOrigins });
+    await chrome.storage.local.set({ downloadOrigins });
   }
 
   // 2. Fall back to default project
@@ -55,13 +47,11 @@ chrome.downloads.onChanged.addListener(async (delta) => {
     if (activeProject) projectName = activeProject;
   }
 
-  // 3. Move if we have a target — otherwise leave it alone in Downloads
+  // 3. Move if we have a target — otherwise leave in Downloads
   if (projectName) {
     await moveFile(download.filename, projectName);
   }
 });
-
-// ── Move function ─────────────────────────────────────────────────────────────
 
 async function moveFile(filePath, projectName) {
   try {

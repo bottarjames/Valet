@@ -7,17 +7,16 @@
 </head>
 <body>
 
-  <!-- Header -->
   <div class="header">
     <img src="icons/icon16.png" alt="" class="logo-img" />
     <span class="title">Valet</span>
     <span class="bridge-dot" id="bridge-dot"></span>
   </div>
 
-  <!-- Default destination -->
+  <!-- Default destination — single dropdown -->
   <div class="section">
     <div class="section-label">SEND DOWNLOADS TO</div>
-    <div id="project-list" class="radio-group"></div>
+    <select id="dest-select" class="dest-select"></select>
   </div>
 
   <!-- Tab group rules -->
@@ -32,7 +31,6 @@
     <div id="project-mgmt"></div>
     <button class="add-btn" id="add-project-btn">+ Add project</button>
 
-    <!-- Inline add form (hidden by default) -->
     <div id="add-form" class="add-form" style="display:none">
       <button class="browse-btn" id="browse-btn">📂 Choose folder…</button>
       <div id="chosen-folder" class="chosen-folder" style="display:none">
@@ -53,8 +51,7 @@
     </div>
   </div>
 
-  <!-- Footer -->
-  <div class="footer" id="footer-status">
+  <div class="footer">
     <span id="status-text">Checking bridge…</span>
   </div>
 

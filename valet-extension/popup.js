@@ -47,36 +47,29 @@ async function loadProjects() {
   } catch (_) { projects = {}; folderOk = {}; }
 }
 
-// ── Default destination ───────────────────────────────────────────────────────
+// ── Default destination (dropdown) ───────────────────────────────────────────
 
 async function renderDestination() {
   const { activeProject = "" } = await chrome.storage.local.get("activeProject");
-  const list = document.getElementById("project-list");
-  list.innerHTML = "";
+  const sel = document.getElementById("dest-select");
+  sel.innerHTML = "";
 
-  if (Object.keys(projects).length === 0) {
-    list.innerHTML = '<div class="empty-msg">Add a project below to get started</div>';
-    return;
-  }
+  const keepOpt = document.createElement("option");
+  keepOpt.value       = "";
+  keepOpt.textContent = "Keep in Downloads";
+  sel.appendChild(keepOpt);
 
   for (const name of Object.keys(projects)) {
-    list.appendChild(makeRadio(name, name, activeProject));
+    const opt = document.createElement("option");
+    opt.value       = name;
+    opt.textContent = name;
+    if (name === activeProject) opt.selected = true;
+    sel.appendChild(opt);
   }
 
-  list.querySelectorAll('input[type="radio"]').forEach((r) =>
-    r.addEventListener("change", () => chrome.storage.local.set({ activeProject: r.value }))
+  sel.addEventListener("change", () =>
+    chrome.storage.local.set({ activeProject: sel.value })
   );
-}
-
-function makeRadio(value, label, selected) {
-  const div = document.createElement("div");
-  div.className = "radio-row";
-  const id = `r-${value.replace(/\W/g, "_")}`;
-  div.innerHTML = `
-    <input type="radio" name="dest" value="${esc(value)}" id="${id}"
-           ${value === selected ? "checked" : ""}>
-    <label for="${id}">${esc(label)}</label>`;
-  return div;
 }
 
 // ── Tab group rules ───────────────────────────────────────────────────────────
@@ -111,7 +104,7 @@ async function renderGroups() {
     const sel = document.createElement("select");
     sel.className = "group-select";
     sel.innerHTML =
-      `<option value="">Off</option>` +
+      `<option value="">Keep in Downloads</option>` +
       Object.keys(projects)
         .map((p) => `<option value="${esc(p)}" ${groupMappings[title] === p ? "selected" : ""}>${esc(p)}</option>`)
         .join("");
