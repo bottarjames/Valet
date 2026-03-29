@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
 generate_icons.py — creates icon16.png, icon48.png, icon128.png
-Rounded dark background with a clean white folder + inward arrow.
-Requires Pillow (pip install pillow).
+Transparent background. Vivid gradient folder with white arrow.
+Requires Pillow.
 """
 
 import os
@@ -10,64 +10,84 @@ from PIL import Image, ImageDraw
 
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "icons")
 
-BG       = (15,  15,  20,  255)   # near-black bg
-FOLDER   = (255, 255, 255, 220)   # white folder
-ARROW    = (80,  160, 255, 255)   # blue accent arrow
 
-
-def rounded_rect(draw, xy, radius, fill):
-    x0, y0, x1, y1 = xy
-    draw.rectangle([x0 + radius, y0, x1 - radius, y1], fill=fill)
-    draw.rectangle([x0, y0 + radius, x1, y1 - radius], fill=fill)
-    draw.ellipse([x0, y0, x0 + radius * 2, y0 + radius * 2], fill=fill)
-    draw.ellipse([x1 - radius * 2, y0, x1, y0 + radius * 2], fill=fill)
-    draw.ellipse([x0, y1 - radius * 2, x0 + radius * 2, y1], fill=fill)
-    draw.ellipse([x1 - radius * 2, y1 - radius * 2, x1, y1], fill=fill)
+def lerp_color(a, b, t):
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(4))
 
 
 def make_icon(size: int) -> Image.Image:
-    scale = 4  # draw at 4x for anti-aliasing
+    scale = 4
     s = size * scale
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
-    d = ImageDraw.Draw(img)
+    d   = ImageDraw.Draw(img)
 
-    # Background rounded square
-    r = s // 5
-    rounded_rect(d, [0, 0, s, s], r, BG)
+    pad  = int(s * 0.06)
+    fw   = s - pad * 2
+    fh   = int(fw * 0.74)
+    fx   = pad
+    fy   = (s - fh) // 2 + int(s * 0.06)
 
-    pad   = s // 7
-    fw    = s - pad * 2          # folder width
-    fh    = int(fw * 0.72)       # folder height
-    fx    = pad
-    fy    = (s - fh) // 2 + s // 20  # slightly below center
+    # ── Folder tab ──────────────────────────────────────────────────────────
+    tab_w = int(fw * 0.44)
+    tab_h = int(fh * 0.20)
+    tab_r = int(tab_h * 0.7)
 
-    # Folder tab
-    tab_w = int(fw * 0.42)
-    tab_h = int(fh * 0.18)
-    tab_r = int(tab_h * 0.6)
-    rounded_rect(d, [fx, fy - tab_h, fx + tab_w, fy + tab_r], tab_r, FOLDER)
+    # Gradient: top of tab = light blue, body bottom = indigo
+    TOP    = (100, 200, 255, 255)
+    BOTTOM = (80,  90,  240, 255)
 
-    # Folder body
-    body_r = max(2, s // 28)
-    rounded_rect(d, [fx, fy, fx + fw, fy + fh], body_r, FOLDER)
+    tab_img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    td = ImageDraw.Draw(tab_img)
 
-    # Arrow: downward-pointing chevron centred in body
-    if size >= 32:
-        cx    = fx + fw // 2
-        cy    = fy + int(fh * 0.56)
-        aw    = int(fw * 0.30)
-        ah    = int(fh * 0.28)
-        sw    = max(2, s // 26)
+    # Draw tab shape
+    td.rounded_rectangle(
+        [fx, fy - tab_h, fx + tab_w, fy + tab_r],
+        radius=tab_r, fill=(255, 255, 255, 255)
+    )
+
+    # ── Folder body ─────────────────────────────────────────────────────────
+    body_r = max(3, s // 22)
+    td.rounded_rectangle(
+        [fx, fy, fx + fw, fy + fh],
+        radius=body_r, fill=(255, 255, 255, 255)
+    )
+
+    # Apply vertical gradient by masking with gradient pixels
+    folder_mask = tab_img.split()[3]  # alpha = shape mask
+
+    # Build gradient layer
+    grad = Image.new("RGBA", (s, s), (0, 0, 0, 0))
+    for row in range(s):
+        t = max(0.0, min(1.0, (row - (fy - tab_h)) / (fh + tab_h)))
+        color = lerp_color(TOP, BOTTOM, t)
+        grad.paste(Image.new("RGBA", (s, 1), color), (0, row))
+
+    grad.putalpha(folder_mask)
+    img = Image.alpha_composite(img, grad)
+
+    # ── Arrow ────────────────────────────────────────────────────────────────
+    if size >= 24:
+        d2  = ImageDraw.Draw(img)
+        cx  = fx + fw // 2
+        cy  = fy + int(fh * 0.56)
+        aw  = int(fw * 0.22)
+        ah  = int(fh * 0.34)
+        sw  = max(2, s // 20)
+        col = (255, 255, 255, 230)
 
         # Stem
-        d.rectangle([cx - sw // 2, cy - ah, cx + sw // 2, cy + ah // 3], fill=ARROW)
-        # Arrow head (two diagonal lines)
-        for dx, sign in [(-1, 1), (1, -1)]:
-            d.line(
-                [cx + dx * aw // 2, cy - ah // 5,
-                 cx,                cy + ah * 2 // 3],
-                fill=ARROW, width=sw
-            )
+        d2.rounded_rectangle(
+            [cx - sw // 2, cy - ah // 2, cx + sw // 2, cy + ah // 4],
+            radius=sw // 2, fill=col
+        )
+        # Arrowhead: solid filled triangle
+        tip_x, tip_y = cx, cy + ah // 2
+        d2.polygon(
+            [tip_x - aw, cy - ah // 8,
+             tip_x + aw, cy - ah // 8,
+             tip_x,      tip_y],
+            fill=col
+        )
 
     return img.resize((size, size), Image.LANCZOS)
 
