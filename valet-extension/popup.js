@@ -146,14 +146,14 @@ async function renderProjectMgmt() {
 
     if (healthy) {
       row.innerHTML = `
-        <span class="mgmt-name">${esc(name)}</span>
+        <span class="mgmt-name" title="Double-click to rename">${esc(name)}</span>
         <span class="mgmt-path" title="${esc(path)}">${esc(path)}</span>
         <button class="remove-btn" title="Remove project" data-name="${esc(name)}">×</button>`;
     } else {
       row.innerHTML = `
         <span class="warn-icon" title="Folder not found">⚠️</span>
         <div class="mgmt-broken-info">
-          <span class="mgmt-name">${esc(name)}</span>
+          <span class="mgmt-name" title="Double-click to rename">${esc(name)}</span>
           <span class="mgmt-missing">Folder not found — needs relocating</span>
         </div>
         <button class="relocate-btn" data-name="${esc(name)}" title="Pick new folder">Relocate</button>
@@ -163,6 +163,9 @@ async function renderProjectMgmt() {
     container.appendChild(row);
   }
 
+  container.querySelectorAll(".mgmt-name").forEach((span) =>
+    span.addEventListener("dblclick", () => startRename(span, span.textContent))
+  );
   container.querySelectorAll(".remove-btn").forEach((btn) =>
     btn.addEventListener("click", () => removeProject(btn.dataset.name))
   );
@@ -316,6 +319,73 @@ function showFormError(msg) {
   document.getElementById("add-form").appendChild(err);
 }
 function clearFormError() { document.getElementById("form-error")?.remove(); }
+
+// ── Rename project (double-click) ─────────────────────────────────────────────
+
+function startRename(nameSpan, oldName) {
+  const input = document.createElement("input");
+  input.type      = "text";
+  input.value     = oldName;
+  input.className = "rename-input";
+  nameSpan.replaceWith(input);
+  input.focus();
+  input.select();
+
+  let committed = false;
+
+  async function commit() {
+    if (committed) return;
+    committed = true;
+    const newName = input.value.trim();
+    if (!newName || newName === oldName) { cancel(); return; }
+    input.disabled = true;
+    await renameProject(oldName, newName);
+  }
+
+  function cancel() {
+    if (committed) return;
+    committed = true;
+    input.replaceWith(nameSpan);
+  }
+
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter")  { e.preventDefault(); commit(); }
+    if (e.key === "Escape") { e.preventDefault(); cancel(); }
+    e.stopPropagation();
+  });
+  input.addEventListener("blur", cancel);
+}
+
+async function renameProject(oldName, newName) {
+  const path = projects[oldName];
+  try {
+    await fetch(`${BRIDGE}/projects/remove`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: oldName }),
+    });
+    await fetch(`${BRIDGE}/projects/add`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name: newName, path }),
+    });
+
+    // Update groupMappings that referenced the old name
+    const { groupMappings = {} } = await chrome.storage.local.get("groupMappings");
+    let changed = false;
+    for (const group of Object.keys(groupMappings)) {
+      if (groupMappings[group] === oldName) { groupMappings[group] = newName; changed = true; }
+    }
+    if (changed) await chrome.storage.local.set({ groupMappings });
+
+    // Update default project if it was the renamed one
+    const { activeProject } = await chrome.storage.local.get("activeProject");
+    if (activeProject === oldName) await chrome.storage.local.set({ activeProject: newName });
+
+    await loadProjects();
+    await renderDestination();
+    await renderGroups();
+    await renderProjectMgmt();
+  } catch (e) { console.error("Rename failed", e); }
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

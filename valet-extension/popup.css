@@ -77,7 +77,19 @@ body {
   transition: background .12s;
 }
 .project-mgmt-row:hover { background: #1c1c1e; }
-.mgmt-name { flex: 1; font-size: 13px; font-weight: 500; color: #e5e5ea; }
+.mgmt-name {
+  flex: 1; font-size: 13px; font-weight: 500; color: #e5e5ea;
+  cursor: default;
+}
+.mgmt-name:hover { color: #fff; }
+
+.rename-input {
+  flex: 1; font-size: 13px; font-weight: 500;
+  background: #111113; color: #e5e5ea;
+  border: 1px solid #0a84ff; border-radius: 5px;
+  padding: 1px 6px; outline: none;
+  min-width: 0;
+}
 .mgmt-path {
   font-size: 11px; color: #48484a;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
