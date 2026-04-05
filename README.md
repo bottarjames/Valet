@@ -1,4 +1,4 @@
-# Valet 🗂️
+# Valet
 
 > Routes your Chrome downloads straight into the right project folder — automatically.
 
@@ -6,27 +6,27 @@ No more digging through Downloads. Assign rules to tab groups, and Valet moves f
 
 ---
 
-## ⬇️ Download
-
-**[→ Download Valet v1.1 (latest)](https://github.com/bottarjames/Valet/releases/latest)**
-
----
-
 ## Install
 
-### macOS — no Python required
+### macOS — one command
 
-1. Download and unzip **Valet-v1.1.zip** from the link above
-2. Open the `valet-extension` folder
-3. Open Terminal, drag **`install.sh`** into it, press Enter
-4. In Chrome → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the `valet-extension` folder
+```bash
+curl -fsSL https://raw.githubusercontent.com/bottarjames/Valet/main/install.sh | bash
+```
+
+Then in Chrome:
+1. Go to `chrome://extensions`
+2. Enable **Developer mode** (top-right)
+3. Click **Load unpacked**
+4. Press **Cmd+Shift+G** and paste: `~/.valet/extension`
+5. Click **Select**
 
 ### Windows
 
-1. Download and unzip **Valet-v1.1.zip** from the link above
-2. Open the `windows` folder
+1. Download **[Valet-v1.3.zip](https://github.com/bottarjames/Valet/releases/latest)** from Releases
+2. Unzip → open the `windows` folder
 3. Double-click **Install Valet.bat**
-4. In Chrome → `chrome://extensions` → enable **Developer mode** → **Load unpacked** → select the `valet-extension` folder
+4. In Chrome → `chrome://extensions` → **Developer mode** → **Load unpacked** → select the `valet-extension` folder
 
 ---
 
