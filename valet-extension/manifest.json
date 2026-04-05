@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Valet",
-  "version": "1.4.0",
-  "description": "Auto-name and route AI-generated downloads to the right folder. Smart naming from prompts, tab group routing.",
+  "version": "1.0",
+  "description": "Route Chrome downloads directly to your Valet projects. Supports per-tab-group rules.",
 
   "permissions": [
     "downloads",
@@ -19,14 +19,6 @@
   "background": {
     "service_worker": "background.js"
   },
-
-  "content_scripts": [
-    {
-      "matches": ["<all_urls>"],
-      "js": ["content_script.js"],
-      "run_at": "document_idle"
-    }
-  ],
 
   "action": {
     "default_popup": "popup.html",
