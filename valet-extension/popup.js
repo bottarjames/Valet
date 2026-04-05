@@ -8,11 +8,24 @@ let folderOk = {};
 document.addEventListener("DOMContentLoaded", async () => {
   const online = await checkBridge();
   if (online) await loadProjects();
+  await renderAutoNaming();
   await renderDestination();
   await renderGroups();
   await renderProjectMgmt();
   wireAddForm();
 });
+
+// ── Auto-naming toggle ───────────────────────────────────────────────────────
+
+async function renderAutoNaming() {
+  const toggle = document.getElementById("auto-naming-toggle");
+  const { autoNaming = true } = await chrome.storage.local.get("autoNaming");
+  toggle.checked = autoNaming;
+
+  toggle.addEventListener("change", () => {
+    chrome.storage.local.set({ autoNaming: toggle.checked });
+  });
+}
 
 // ── Bridge health ─────────────────────────────────────────────────────────────
 
