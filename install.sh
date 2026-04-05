@@ -62,7 +62,7 @@ fi
 mkdir -p "$EXTENSION_DIR/icons"
 BASE_RAW="https://raw.githubusercontent.com/$REPO/main/valet-extension"
 
-for f in manifest.json background.js content_script.js popup.html popup.js popup.css; do
+for f in manifest.json background.js popup.html popup.js popup.css; do
   curl -fsSL "$BASE_RAW/$f" -o "$EXTENSION_DIR/$f"
 done
 for icon in icon16.png icon48.png icon128.png; do
