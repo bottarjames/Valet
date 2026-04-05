@@ -25,6 +25,8 @@ LOG_PATH    = os.path.expanduser("~/.valet/bridge.log")
 PORT = 27182
 SYSTEM = platform.system()  # "Darwin" or "Windows"
 
+os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
+
 logging.basicConfig(
     filename=LOG_PATH,
     level=logging.DEBUG,
