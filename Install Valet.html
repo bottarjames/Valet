@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Install Valet</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
+    background: #111113; color: #e5e5ea;
+    display: flex; justify-content: center; align-items: center;
+    min-height: 100vh; padding: 40px;
+  }
+  .card {
+    max-width: 540px; width: 100%;
+    background: #1c1c1e; border-radius: 16px;
+    padding: 40px; text-align: center;
+    border: 1px solid #2c2c2e;
+  }
+  h1 { font-size: 28px; font-weight: 600; margin-bottom: 8px; }
+  .sub { color: #636366; font-size: 15px; margin-bottom: 32px; }
+  .steps { text-align: left; margin-bottom: 28px; }
+  .step {
+    display: flex; gap: 12px; margin-bottom: 16px;
+    align-items: flex-start;
+  }
+  .num {
+    background: #0a84ff; color: #fff; font-weight: 600;
+    width: 28px; height: 28px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .step-text { font-size: 15px; line-height: 1.5; padding-top: 3px; }
+  .step-text strong { color: #fff; }
+  .cmd-box {
+    background: #111113; border: 1px solid #2c2c2e;
+    border-radius: 10px; padding: 14px 16px;
+    font-family: "SF Mono", Menlo, monospace;
+    font-size: 13px; color: #30d158;
+    text-align: left; word-break: break-all;
+    margin-bottom: 16px; position: relative;
+    cursor: pointer; transition: border-color .15s;
+    line-height: 1.5;
+  }
+  .cmd-box:hover { border-color: #0a84ff; }
+  .copy-btn {
+    background: #0a84ff; color: #fff; border: none;
+    border-radius: 10px; padding: 12px 28px;
+    font-size: 15px; font-weight: 500; cursor: pointer;
+    transition: background .15s; width: 100%;
+  }
+  .copy-btn:hover { background: #409cff; }
+  .copy-btn.copied { background: #30d158; }
+  .note {
+    margin-top: 24px; font-size: 13px; color: #48484a;
+    line-height: 1.5;
+  }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Install Valet</h1>
+  <p class="sub">Takes about 10 seconds</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="num">1</div>
+      <div class="step-text">Open <strong>Terminal</strong> — press <strong>Cmd+Space</strong>, type <strong>Terminal</strong>, press Enter</div>
+    </div>
+    <div class="step">
+      <div class="num">2</div>
+      <div class="step-text">Click the box below to copy the install command, then paste it in Terminal with <strong>Cmd+V</strong> and press <strong>Enter</strong></div>
+    </div>
+  </div>
+
+  <div class="cmd-box" id="cmd" onclick="copyCmd()">curl -fsSL https://raw.githubusercontent.com/bottarjames/Valet/main/install.sh | bash</div>
+  <button class="copy-btn" id="copyBtn" onclick="copyCmd()">Copy command</button>
+
+  <div class="steps" style="margin-top: 28px;">
+    <div class="step">
+      <div class="num">3</div>
+      <div class="step-text">In Chrome → <strong>chrome://extensions</strong> → enable <strong>Developer mode</strong> → <strong>Load unpacked</strong> → press <strong>Cmd+Shift+G</strong> → paste <strong>~/.valet/extension</strong></div>
+    </div>
+  </div>
+
+  <p class="note">Everything runs locally on your machine. No accounts, no cloud, no tracking.</p>
+</div>
+
+<script>
+function copyCmd() {
+  const cmd = "curl -fsSL https://raw.githubusercontent.com/bottarjames/Valet/main/install.sh | bash";
+  navigator.clipboard.writeText(cmd);
+  const btn = document.getElementById("copyBtn");
+  btn.textContent = "Copied!";
+  btn.classList.add("copied");
+  setTimeout(() => { btn.textContent = "Copy command"; btn.classList.remove("copied"); }, 2000);
+}
+</script>
+</body>
+</html>
