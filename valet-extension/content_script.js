@@ -5,7 +5,6 @@
 (() => {
   "use strict";
 
-  // Debounce to avoid spamming the background script
   let lastSent = 0;
   const COOLDOWN = 500;
 
@@ -28,19 +27,16 @@
       }
     }
 
-    // 3. Scan all visible textareas/inputs for prompt-like content
-    //    Prefer the longest one — AI prompt fields tend to have the most text
+    // 3. Standard form elements — textareas and inputs
     let best = null;
     let bestLen = 0;
 
-    const candidates = document.querySelectorAll(
+    const formElements = document.querySelectorAll(
       'textarea, input[type="text"], [contenteditable="true"], [contenteditable=""]'
     );
 
-    for (const el of candidates) {
-      // Skip hidden elements
+    for (const el of formElements) {
       if (el.offsetParent === null && !el.closest('[role="dialog"]')) continue;
-
       const text = (el.value || el.textContent || "").trim();
       if (text.length > 10 && text.length < 2000 && text.length > bestLen) {
         best = text;
@@ -50,25 +46,76 @@
 
     if (best) return best;
 
-    // 4. Look for common prompt display patterns (read-only prompt shown near image)
-    //    Many platforms show the prompt as plain text near the generated image
+    // 4. Prompt-specific selectors — attributes and classes that AI platforms use
     const promptSelectors = [
-      '[data-testid*="prompt"]',
-      '[class*="prompt"]',
+      // Attribute-based (most reliable)
+      '[data-testid*="prompt" i]',
+      '[data-cy*="prompt" i]',
       '[aria-label*="prompt" i]',
-      '[class*="generation-text"]',
-      '[class*="description"]',
+      '[placeholder*="prompt" i]',
+      '[name*="prompt" i]',
+      // Class/id based
+      '[class*="prompt" i]',
+      '[id*="prompt" i]',
+      // Common AI platform patterns
+      '[class*="generation-text" i]',
+      '[class*="image-description" i]',
+      '[class*="creation-prompt" i]',
+      '[class*="prompt-text" i]',
+      '[class*="promptText" i]',
+      '[class*="prompt_text" i]',
+      '[class*="ai-prompt" i]',
     ];
 
     for (const selector of promptSelectors) {
       try {
         const els = document.querySelectorAll(selector);
         for (const el of els) {
-          const text = (el.textContent || "").trim();
+          // Skip containers that are too large (nav bars, wrappers)
+          if (el.children.length > 10) continue;
+
+          const text = (el.value || el.innerText || el.textContent || "").trim();
           if (text.length > 10 && text.length < 2000 && text.length > bestLen) {
             best = text;
             bestLen = text.length;
           }
+        }
+      } catch (_) {}
+    }
+
+    if (best) return best;
+
+    // 5. Proximity search — find text near download/generate buttons
+    //    Look for the nearest descriptive text block to action buttons
+    const buttonSelectors = [
+      'button[class*="download" i]',
+      'button[aria-label*="download" i]',
+      'a[download]',
+      'button[class*="generate" i]',
+      'button[class*="create" i]',
+      '[data-testid*="download" i]',
+    ];
+
+    for (const btnSel of buttonSelectors) {
+      try {
+        const buttons = document.querySelectorAll(btnSel);
+        for (const btn of buttons) {
+          // Walk up to find a container, then look for text siblings
+          let container = btn.parentElement;
+          for (let i = 0; i < 5 && container; i++) {
+            const textEls = container.querySelectorAll('p, span, div');
+            for (const te of textEls) {
+              if (te.children.length > 3) continue; // skip containers
+              const text = (te.innerText || te.textContent || "").trim();
+              if (text.length > 20 && text.length < 2000 && text.length > bestLen) {
+                best = text;
+                bestLen = text.length;
+              }
+            }
+            if (best) break;
+            container = container.parentElement;
+          }
+          if (best) break;
         }
       } catch (_) {}
     }
@@ -100,20 +147,9 @@
 
   // ── Trigger on interactions that typically precede a download ──────────────
 
-  // Click anywhere — captures download button clicks
-  document.addEventListener("click", () => {
-    sendMetadata();
-  }, true);
-
-  // Also capture right-click → "Save image as..."
-  document.addEventListener("contextmenu", () => {
-    sendMetadata();
-  }, true);
-
-  // Keyboard shortcut downloads (Ctrl+S, etc.)
+  document.addEventListener("click", () => sendMetadata(), true);
+  document.addEventListener("contextmenu", () => sendMetadata(), true);
   document.addEventListener("keydown", (e) => {
-    if ((e.ctrlKey || e.metaKey) && e.key === "s") {
-      sendMetadata();
-    }
+    if ((e.ctrlKey || e.metaKey) && e.key === "s") sendMetadata();
   }, true);
 })();
